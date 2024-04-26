@@ -235,9 +235,32 @@ class BasePCOptimizer (nn.Module):
 
     def clean_pointcloud(self, **kw):
         cams = inv(self.get_im_poses())
-        K = self.get_intrinsics()
+        Ks = self.get_intrinsics()
         depthmaps = self.get_depthmaps()
         all_pts3d = self.get_pts3d()
+        res = deepcopy(self)
+
+        for i, pts3d in enumerate(self.depth_to_pts3d()):
+            for j in range(self.n_imgs):
+
+                if self.same_focals:
+                    K = Ks[0]
+                else:
+                    K = Ks[j]
+
+                if i == j:
+                    continue
+
+                # project 3dpts in other view
+                Hi, Wi = self.imshapes[i]
+                Hj, Wj = self.imshapes[j]
+                proj = geotrf(cams[j], pts3d[:Hi*Wi]).reshape(Hi, Wi, 3)
+                proj_depth = proj[:, :, 2]
+                u, v = geotrf(K, proj, norm=1, ncol=2).round().long().unbind(-1)
+
+                # check which points are actually in the visible cone
+                msk_i = (proj_depth > 0) & (0 <= u) & (u < Wj) & (0 <= v) & (v < Hj)
+                msk_j = v[msk_i], u[msk_i]
 
         new_im_confs = clean_pointcloud(self.im_conf, K, cams, depthmaps, all_pts3d, **kw)
 
