@@ -4,13 +4,13 @@
 # --------------------------------------------------------
 # utility functions for global alignment
 # --------------------------------------------------------
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
 
 
 def edge_str(i, j):
-    return f'{i}_{j}'
+    return f"{i}_{j}"
 
 
 def i_j_ij(ij):
@@ -37,34 +37,46 @@ def get_imshapes(edges, pred_i, pred_j):
         shape_i = tuple(pred_i[e].shape[0:2])
         shape_j = tuple(pred_j[e].shape[0:2])
         if imshapes[i]:
-            assert imshapes[i] == shape_i, f'incorrect shape for image {i}'
+            assert imshapes[i] == shape_i, f"incorrect shape for image {i}"
         if imshapes[j]:
-            assert imshapes[j] == shape_j, f'incorrect shape for image {j}'
+            assert imshapes[j] == shape_j, f"incorrect shape for image {j}"
         imshapes[i] = shape_i
         imshapes[j] = shape_j
     return imshapes
 
 
 def get_conf_trf(mode):
-    if mode == 'log':
-        def conf_trf(x): return x.log()
-    elif mode == 'sqrt':
-        def conf_trf(x): return x.sqrt()
-    elif mode == 'm1':
-        def conf_trf(x): return x-1
-    elif mode in ('id', 'none'):
-        def conf_trf(x): return x
+    if mode == "log":
+
+        def conf_trf(x):
+            return x.log()
+
+    elif mode == "sqrt":
+
+        def conf_trf(x):
+            return x.sqrt()
+
+    elif mode == "m1":
+
+        def conf_trf(x):
+            return x - 1
+
+    elif mode in ("id", "none"):
+
+        def conf_trf(x):
+            return x
+
     else:
-        raise ValueError(f'bad mode for {mode=}')
+        raise ValueError(f"bad mode for {mode=}")
     return conf_trf
 
 
 def l2_dist(a, b, weight):
-    return ((a - b).square().sum(dim=-1) * weight)
+    return (a - b).square().sum(dim=-1) * weight
 
 
 def l1_dist(a, b, weight):
-    return ((a - b).norm(dim=-1) * weight)
+    return (a - b).norm(dim=-1) * weight
 
 
 ALL_DISTS = dict(l1=l1_dist, l2=l2_dist)
@@ -82,7 +94,7 @@ def signed_expm1(x):
 
 def cosine_schedule(t, lr_start, lr_end):
     assert 0 <= t <= 1
-    return lr_end + (lr_start - lr_end) * (1+np.cos(t * np.pi))/2
+    return lr_end + (lr_start - lr_end) * (1 + np.cos(t * np.pi)) / 2
 
 
 def linear_schedule(t, lr_start, lr_end):

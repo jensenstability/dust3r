@@ -4,18 +4,26 @@
 # --------------------------------------------------------
 # geometry utilitary functions
 # --------------------------------------------------------
-import torch
 import numpy as np
+import torch
+from dust3r.utils.device import to_numpy
+from dust3r.utils.misc import invalid_to_nans, invalid_to_zeros
 from scipy.spatial import cKDTree as KDTree
 
-from dust3r.utils.misc import invalid_to_zeros, invalid_to_nans
-from dust3r.utils.device import to_numpy
 
-
-def xy_grid(W, H, device=None, origin=(0, 0), unsqueeze=None, cat_dim=-1, homogeneous=False, **arange_kw):
-    """ Output a (H,W,2) array of int32 
-        with output[j,i,0] = i + origin[0]
-             output[j,i,1] = j + origin[1]
+def xy_grid(
+    W,
+    H,
+    device=None,
+    origin=(0, 0),
+    unsqueeze=None,
+    cat_dim=-1,
+    homogeneous=False,
+    **arange_kw,
+):
+    """Output a (H,W,2) array of int32
+    with output[j,i,0] = i + origin[0]
+         output[j,i,1] = j + origin[1]
     """
     if device is None:
         # numpy
@@ -27,7 +35,7 @@ def xy_grid(W, H, device=None, origin=(0, 0), unsqueeze=None, cat_dim=-1, homoge
         ones = lambda *a: torch.ones(*a, device=device)
 
     tw, th = [arange(o, o + s, **arange_kw) for s, o in zip((W, H), origin)]
-    grid = meshgrid(tw, th, indexing='xy')
+    grid = meshgrid(tw, th, indexing="xy")
     if homogeneous:
         grid = grid + (ones((H, W)),)
     if unsqueeze is not None:
@@ -38,7 +46,7 @@ def xy_grid(W, H, device=None, origin=(0, 0), unsqueeze=None, cat_dim=-1, homoge
 
 
 def geotrf(Trf, pts, ncol=None, norm=False):
-    """ Apply a geometric transformation to a list of 3-D points.
+    """Apply a geometric transformation to a list of 3-D points.
 
     H: 3x3 or 4x4 projection matrix (typically a Homography)
     p: numpy/torch/tuple of coordinates. Shape must be (...,2) or (...,3)
@@ -59,19 +67,26 @@ def geotrf(Trf, pts, ncol=None, norm=False):
     ncol = ncol or pts.shape[-1]
 
     # optimized code
-    if (isinstance(Trf, torch.Tensor) and isinstance(pts, torch.Tensor) and
-            Trf.ndim == 3 and pts.ndim == 4):
+    if (
+        isinstance(Trf, torch.Tensor)
+        and isinstance(pts, torch.Tensor)
+        and Trf.ndim == 3
+        and pts.ndim == 4
+    ):
         d = pts.shape[3]
         if Trf.shape[-1] == d:
             pts = torch.einsum("bij, bhwj -> bhwi", Trf, pts)
         elif Trf.shape[-1] == d + 1:
-            pts = torch.einsum("bij, bhwj -> bhwi", Trf[:, :d, :d], pts) + Trf[:, None, None, :d, d]
+            pts = (
+                torch.einsum("bij, bhwj -> bhwi", Trf[:, :d, :d], pts)
+                + Trf[:, None, None, :d, d]
+            )
         else:
-            raise ValueError(f'bad shape, not ending with 3 or 4, for {pts.shape=}')
+            raise ValueError(f"bad shape, not ending with 3 or 4, for {pts.shape=}")
     else:
         if Trf.ndim >= 3:
             n = Trf.ndim - 2
-            assert Trf.shape[:n] == pts.shape[:n], 'batch size does not match'
+            assert Trf.shape[:n] == pts.shape[:n], "batch size does not match"
             Trf = Trf.reshape(-1, Trf.shape[-2], Trf.shape[-1])
 
             if pts.ndim > Trf.ndim:
@@ -102,13 +117,12 @@ def geotrf(Trf, pts, ncol=None, norm=False):
 
 
 def inv(mat):
-    """ Invert a torch or numpy matrix
-    """
+    """Invert a torch or numpy matrix"""
     if isinstance(mat, torch.Tensor):
         return torch.linalg.inv(mat)
     if isinstance(mat, np.ndarray):
         return np.linalg.inv(mat)
-    raise ValueError(f'bad matrix type = {type(mat)}')
+    raise ValueError(f"bad matrix type = {type(mat)}")
 
 
 def depthmap_to_pts3d(depth, pseudo_focal, pp=None, **_):
@@ -193,21 +207,24 @@ def depthmap_to_camera_coordinates(depthmap, camera_intrinsics, pseudo_focal=Non
     X_cam = np.stack((x_cam, y_cam, z_cam), axis=-1).astype(np.float32)
 
     # Mask for valid coordinates
-    valid_mask = (depthmap > 0.0)
+    valid_mask = depthmap > 0.0
     return X_cam, valid_mask
 
 
-def depthmap_to_absolute_camera_coordinates(depthmap, camera_intrinsics, camera_pose, **kw):
+def depthmap_to_absolute_camera_coordinates(
+    depthmap, camera_intrinsics, camera_pose, **kw
+):
     """
     Args:
         - depthmap (HxW array):
         - camera_intrinsics: a 3x3 matrix
         - camera_pose: a 4x3 or 4x4 cam2world matrix
     Returns:
-        pointmap of absolute coordinates (HxWx3 array), and a mask specifying valid pixels."""
+        pointmap of absolute coordinates (HxWx3 array), and a mask specifying valid pixels.
+    """
     X_cam, valid_mask = depthmap_to_camera_coordinates(depthmap, camera_intrinsics)
 
-    X_world = X_cam # default
+    X_world = X_cam  # default
     if camera_pose is not None:
         # R_cam2world = np.float32(camera_params["R_cam2world"])
         # t_cam2world = np.float32(camera_params["t_cam2world"]).squeeze()
@@ -215,7 +232,9 @@ def depthmap_to_absolute_camera_coordinates(depthmap, camera_intrinsics, camera_
         t_cam2world = camera_pose[:3, 3]
 
         # Express in absolute coordinates (invalid depth values)
-        X_world = np.einsum("ik, vuk -> vui", R_cam2world, X_cam) + t_cam2world[None, None, :]
+        X_world = (
+            np.einsum("ik, vuk -> vui", R_cam2world, X_cam) + t_cam2world[None, None, :]
+        )
 
     return X_world, valid_mask
 
@@ -246,56 +265,63 @@ def opencv_to_colmap_intrinsics(K):
     return K
 
 
-def normalize_pointcloud(pts1, pts2, norm_mode='avg_dis', valid1=None, valid2=None, ret_factor=False):
-    """ renorm pointmaps pts1, pts2 with norm_mode
-    """
+def normalize_pointcloud(
+    pts1, pts2, norm_mode="avg_dis", valid1=None, valid2=None, ret_factor=False
+):
+    """renorm pointmaps pts1, pts2 with norm_mode"""
     assert pts1.ndim >= 3 and pts1.shape[-1] == 3
     assert pts2 is None or (pts2.ndim >= 3 and pts2.shape[-1] == 3)
-    norm_mode, dis_mode = norm_mode.split('_')
+    norm_mode, dis_mode = norm_mode.split("_")
 
-    if norm_mode == 'avg':
+    if norm_mode == "avg":
         # gather all points together (joint normalization)
         nan_pts1, nnz1 = invalid_to_zeros(pts1, valid1, ndim=3)
-        nan_pts2, nnz2 = invalid_to_zeros(pts2, valid2, ndim=3) if pts2 is not None else (None, 0)
-        all_pts = torch.cat((nan_pts1, nan_pts2), dim=1) if pts2 is not None else nan_pts1
+        nan_pts2, nnz2 = (
+            invalid_to_zeros(pts2, valid2, ndim=3) if pts2 is not None else (None, 0)
+        )
+        all_pts = (
+            torch.cat((nan_pts1, nan_pts2), dim=1) if pts2 is not None else nan_pts1
+        )
 
         # compute distance to origin
         all_dis = all_pts.norm(dim=-1)
-        if dis_mode == 'dis':
+        if dis_mode == "dis":
             pass  # do nothing
-        elif dis_mode == 'log1p':
+        elif dis_mode == "log1p":
             all_dis = torch.log1p(all_dis)
-        elif dis_mode == 'warp-log1p':
+        elif dis_mode == "warp-log1p":
             # actually warp input points before normalizing them
             log_dis = torch.log1p(all_dis)
             warp_factor = log_dis / all_dis.clip(min=1e-8)
             H1, W1 = pts1.shape[1:-1]
-            pts1 = pts1 * warp_factor[:, :W1 * H1].view(-1, H1, W1, 1)
+            pts1 = pts1 * warp_factor[:, : W1 * H1].view(-1, H1, W1, 1)
             if pts2 is not None:
                 H2, W2 = pts2.shape[1:-1]
-                pts2 = pts2 * warp_factor[:, W1 * H1:].view(-1, H2, W2, 1)
+                pts2 = pts2 * warp_factor[:, W1 * H1 :].view(-1, H2, W2, 1)
             all_dis = log_dis  # this is their true distance afterwards
         else:
-            raise ValueError(f'bad {dis_mode=}')
+            raise ValueError(f"bad {dis_mode=}")
 
         norm_factor = all_dis.sum(dim=1) / (nnz1 + nnz2 + 1e-8)
     else:
         # gather all points together (joint normalization)
         nan_pts1 = invalid_to_nans(pts1, valid1, ndim=3)
         nan_pts2 = invalid_to_nans(pts2, valid2, ndim=3) if pts2 is not None else None
-        all_pts = torch.cat((nan_pts1, nan_pts2), dim=1) if pts2 is not None else nan_pts1
+        all_pts = (
+            torch.cat((nan_pts1, nan_pts2), dim=1) if pts2 is not None else nan_pts1
+        )
 
         # compute distance to origin
         all_dis = all_pts.norm(dim=-1)
 
-        if norm_mode == 'avg':
+        if norm_mode == "avg":
             norm_factor = all_dis.nanmean(dim=1)
-        elif norm_mode == 'median':
+        elif norm_mode == "median":
             norm_factor = all_dis.nanmedian(dim=1).values.detach()
-        elif norm_mode == 'sqrt':
-            norm_factor = all_dis.sqrt().nanmean(dim=1)**2
+        elif norm_mode == "sqrt":
+            norm_factor = all_dis.sqrt().nanmean(dim=1) ** 2
         else:
-            raise ValueError(f'bad {norm_mode=}')
+            raise ValueError(f"bad {norm_mode=}")
 
     norm_factor = norm_factor.clip(min=1e-8)
     while norm_factor.ndim < pts1.ndim:
@@ -313,7 +339,11 @@ def normalize_pointcloud(pts1, pts2, norm_mode='avg_dis', valid1=None, valid2=No
 def get_joint_pointcloud_depth(z1, z2, valid_mask1, valid_mask2=None, quantile=0.5):
     # set invalid points to NaN
     _z1 = invalid_to_nans(z1, valid_mask1).reshape(len(z1), -1)
-    _z2 = invalid_to_nans(z2, valid_mask2).reshape(len(z2), -1) if z2 is not None else None
+    _z2 = (
+        invalid_to_nans(z2, valid_mask2).reshape(len(z2), -1)
+        if z2 is not None
+        else None
+    )
     _z = torch.cat((_z1, _z2), dim=-1) if z2 is not None else _z1
 
     # compute median depth overall (ignoring nans)
@@ -325,10 +355,16 @@ def get_joint_pointcloud_depth(z1, z2, valid_mask1, valid_mask2=None, quantile=0
 
 
 @torch.no_grad()
-def get_joint_pointcloud_center_scale(pts1, pts2, valid_mask1=None, valid_mask2=None, z_only=False, center=True):
+def get_joint_pointcloud_center_scale(
+    pts1, pts2, valid_mask1=None, valid_mask2=None, z_only=False, center=True
+):
     # set invalid points to NaN
     _pts1 = invalid_to_nans(pts1, valid_mask1).reshape(len(pts1), -1, 3)
-    _pts2 = invalid_to_nans(pts2, valid_mask2).reshape(len(pts2), -1, 3) if pts2 is not None else None
+    _pts2 = (
+        invalid_to_nans(pts2, valid_mask2).reshape(len(pts2), -1, 3)
+        if pts2 is not None
+        else None
+    )
     _pts = torch.cat((_pts1, _pts2), dim=1) if pts2 is not None else _pts1
 
     # compute median center
@@ -355,12 +391,13 @@ def find_reciprocal_matches(P1, P2):
     _, nn1_in_P2 = tree2.query(P1, workers=8)
     _, nn2_in_P1 = tree1.query(P2, workers=8)
 
-    reciprocal_in_P1 = (nn2_in_P1[nn1_in_P2] == np.arange(len(nn1_in_P2)))
-    reciprocal_in_P2 = (nn1_in_P2[nn2_in_P1] == np.arange(len(nn2_in_P1)))
+    reciprocal_in_P1 = nn2_in_P1[nn1_in_P2] == np.arange(len(nn1_in_P2))
+    reciprocal_in_P2 = nn1_in_P2[nn2_in_P1] == np.arange(len(nn2_in_P1))
     assert reciprocal_in_P1.sum() == reciprocal_in_P2.sum()
     return reciprocal_in_P2, nn2_in_P1, reciprocal_in_P2.sum()
 
 
 def get_med_dist_between_poses(poses):
     from scipy.spatial.distance import pdist
+
     return np.median(pdist([to_numpy(p[:3, 3]) for p in poses]))

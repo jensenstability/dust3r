@@ -6,18 +6,18 @@
 # dust3r gradio demo executable
 # --------------------------------------------------------
 import os
-import torch
 import tempfile
 
-from dust3r.model import AsymmetricCroCo3DStereo
-from dust3r.demo import get_args_parser, main_demo, set_print_with_timestamp
-
 import matplotlib.pyplot as pl
+import torch
+from dust3r.demo import get_args_parser, main_demo, set_print_with_timestamp
+from dust3r.model import AsymmetricCroCo3DStereo
+
 pl.ion()
 
 torch.backends.cuda.matmul.allow_tf32 = True  # for gpu >= Ampere and pytorch >= 1.12
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = get_args_parser()
     args = parser.parse_args()
     set_print_with_timestamp()
@@ -30,7 +30,7 @@ if __name__ == '__main__':
     if args.server_name is not None:
         server_name = args.server_name
     else:
-        server_name = '0.0.0.0' if args.local_network else '127.0.0.1'
+        server_name = "0.0.0.0" if args.local_network else "127.0.0.1"
 
     if args.weights is not None:
         weights_path = args.weights
@@ -39,7 +39,15 @@ if __name__ == '__main__':
     model = AsymmetricCroCo3DStereo.from_pretrained(weights_path).to(args.device)
 
     # dust3r will write the 3D model inside tmpdirname
-    with tempfile.TemporaryDirectory(suffix='dust3r_gradio_demo') as tmpdirname:
+    with tempfile.TemporaryDirectory(suffix="dust3r_gradio_demo") as tmpdirname:
         if not args.silent:
-            print('Outputing stuff in', tmpdirname)
-        main_demo(tmpdirname, model, args.device, args.image_size, server_name, args.server_port, silent=args.silent)
+            print("Outputing stuff in", tmpdirname)
+        main_demo(
+            tmpdirname,
+            model,
+            args.device,
+            args.image_size,
+            server_name,
+            args.server_port,
+            silent=args.silent,
+        )

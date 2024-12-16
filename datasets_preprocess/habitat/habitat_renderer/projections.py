@@ -6,6 +6,7 @@
 # --------------------------------------------------------
 import numpy as np
 
+
 class EquirectangularProjection:
     """
     Convention for the central pixel of the equirectangular map similar to OpenCV perspective model:
@@ -29,7 +30,7 @@ class EquirectangularProjection:
             unnormalized 3D rays.
         """
         longitude = self.u_scaling * u - np.pi
-        minus_latitude = self.v_scaling * v - np.pi/2
+        minus_latitude = self.v_scaling * v - np.pi / 2
 
         cos_latitude = np.cos(minus_latitude)
         x, z = np.sin(longitude) * cos_latitude, np.cos(longitude) * cos_latitude
@@ -52,7 +53,7 @@ class EquirectangularProjection:
         minus_latitude = np.arcsin(y)
 
         u = (longitude + np.pi) * (1.0 / self.u_scaling)
-        v = (minus_latitude + np.pi/2) * (1.0 / self.v_scaling)
+        v = (minus_latitude + np.pi / 2) * (1.0 / self.v_scaling)
         return u, v
 
 
@@ -110,21 +111,34 @@ class RotatedProjection:
             rays = np.einsum("ik, ...k -> ...i", self.R_to_base_projection.T, rays)
         return rays
 
+
 def get_projection_rays(projection, noise_level=0):
     """
     Return a 2D map of 3D rays corresponding to the projection.
     If noise_level > 0, add some jittering noise to these rays.
     """
-    grid_u, grid_v = np.meshgrid(0.5 + np.arange(projection.width), 0.5 + np.arange(projection.height))
+    grid_u, grid_v = np.meshgrid(
+        0.5 + np.arange(projection.width), 0.5 + np.arange(projection.height)
+    )
     if noise_level > 0:
-        grid_u += np.clip(0, noise_level * np.random.uniform(-0.5, 0.5, size=grid_u.shape), projection.width)
-        grid_v += np.clip(0, noise_level * np.random.uniform(-0.5, 0.5, size=grid_v.shape), projection.height)
+        grid_u += np.clip(
+            0,
+            noise_level * np.random.uniform(-0.5, 0.5, size=grid_u.shape),
+            projection.width,
+        )
+        grid_v += np.clip(
+            0,
+            noise_level * np.random.uniform(-0.5, 0.5, size=grid_v.shape),
+            projection.height,
+        )
     return projection.unproject(grid_u, grid_v)
 
+
 def compute_camera_intrinsics(height, width, hfov):
-    f = width/2 / np.tan(hfov/2 * np.pi/180)
-    cu, cv = width/2, height/2
+    f = width / 2 / np.tan(hfov / 2 * np.pi / 180)
+    cu, cv = width / 2, height / 2
     return f, cu, cv
+
 
 def colmap_to_opencv_intrinsics(K):
     """
@@ -137,6 +151,7 @@ def colmap_to_opencv_intrinsics(K):
     K[0, 2] -= 0.5
     K[1, 2] -= 0.5
     return K
+
 
 def opencv_to_colmap_intrinsics(K):
     """

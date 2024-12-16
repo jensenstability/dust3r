@@ -4,28 +4,38 @@
 # --------------------------------------------------------
 # utilitary functions for multiprocessing
 # --------------------------------------------------------
-from tqdm import tqdm
-from multiprocessing.dummy import Pool as ThreadPool
 from multiprocessing import cpu_count
+from multiprocessing.dummy import Pool as ThreadPool
+
+from tqdm import tqdm
 
 
-def parallel_threads(function, args, workers=0, star_args=False, kw_args=False, front_num=1, Pool=ThreadPool, **tqdm_kw):
-    """ tqdm but with parallel execution.
+def parallel_threads(
+    function,
+    args,
+    workers=0,
+    star_args=False,
+    kw_args=False,
+    front_num=1,
+    Pool=ThreadPool,
+    **tqdm_kw
+):
+    """tqdm but with parallel execution.
 
-    Will essentially return 
+    Will essentially return
       res = [ function(arg) # default
               function(*arg) # if star_args is True
               function(**arg) # if kw_args is True
               for arg in args]
 
     Note:
-        the <front_num> first elements of args will not be parallelized. 
+        the <front_num> first elements of args will not be parallelized.
         This can be useful for debugging.
     """
     while workers <= 0:
         workers += cpu_count()
     if workers == 1:
-        front_num = float('inf')
+        front_num = float("inf")
 
     # convert into an iterable
     try:
@@ -41,7 +51,9 @@ def parallel_threads(function, args, workers=0, star_args=False, kw_args=False, 
             a = next(args)
         except StopIteration:
             return front  # end of the iterable
-        front.append(function(*a) if star_args else function(**a) if kw_args else function(a))
+        front.append(
+            function(*a) if star_args else function(**a) if kw_args else function(a)
+        )
 
     # then parallel execution
     out = []
@@ -60,20 +72,20 @@ def parallel_threads(function, args, workers=0, star_args=False, kw_args=False, 
 
 
 def parallel_processes(*args, **kwargs):
-    """ Same as parallel_threads, with processes
-    """
+    """Same as parallel_threads, with processes"""
     import multiprocessing as mp
-    kwargs['Pool'] = mp.Pool
+
+    kwargs["Pool"] = mp.Pool
     return parallel_threads(*args, **kwargs)
 
 
 def starcall(args):
-    """ convenient wrapper for Process.Pool """
+    """convenient wrapper for Process.Pool"""
     function, args = args
     return function(*args)
 
 
 def starstarcall(args):
-    """ convenient wrapper for Process.Pool """
+    """convenient wrapper for Process.Pool"""
     function, args = args
     return function(**args)

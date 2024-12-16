@@ -4,16 +4,15 @@
 # --------------------------------------------------------
 # head factory
 # --------------------------------------------------------
-from .linear_head import LinearPts3d
 from .dpt_head import create_dpt_head
+from .linear_head import LinearPts3d
 
 
 def head_factory(head_type, output_mode, net, has_conf=False):
-    """" build a prediction head for the decoder 
-    """
-    if head_type == 'linear' and output_mode == 'pts3d':
+    """ " build a prediction head for the decoder"""
+    if head_type == "linear" and output_mode == "pts3d":
         return LinearPts3d(net, has_conf)
-    elif head_type == 'dpt' and output_mode == 'pts3d':
+    elif head_type == "dpt" and output_mode == "pts3d":
         return create_dpt_head(net, has_conf=has_conf)
     else:
         raise NotImplementedError(f"unexpected {head_type=} and {output_mode=}")

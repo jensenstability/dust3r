@@ -7,32 +7,41 @@
 import numpy as np
 import torch
 import torch.nn as nn
-
 from dust3r.cloud_opt.base_opt import BasePCOptimizer
-from dust3r.utils.geometry import geotrf
 from dust3r.utils.device import to_cpu, to_numpy
-from dust3r.utils.geometry import depthmap_to_pts3d
+from dust3r.utils.geometry import depthmap_to_pts3d, geotrf
 
 
-class ModularPointCloudOptimizer (BasePCOptimizer):
-    """ Optimize a global scene, given a list of pairwise observations.
+class ModularPointCloudOptimizer(BasePCOptimizer):
+    """Optimize a global scene, given a list of pairwise observations.
     Unlike PointCloudOptimizer, you can fix parts of the optimization process (partial poses/intrinsics)
     Graph node: images
     Graph edges: observations = (pred1, pred2)
     """
 
-    def __init__(self, *args, optimize_pp=False, fx_and_fy=False, focal_brake=20, **kwargs):
+    def __init__(
+        self, *args, optimize_pp=False, fx_and_fy=False, focal_brake=20, **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self.has_im_poses = True  # by definition of this class
         self.focal_brake = focal_brake
 
         # adding thing to optimize
-        self.im_depthmaps = nn.ParameterList(torch.randn(H, W)/10-3 for H, W in self.imshapes)  # log(depth)
-        self.im_poses = nn.ParameterList(self.rand_pose(self.POSE_DIM) for _ in range(self.n_imgs))  # camera poses
-        default_focals = [self.focal_brake * np.log(max(H, W)) for H, W in self.imshapes]
-        self.im_focals = nn.ParameterList(torch.FloatTensor([f, f] if fx_and_fy else [
-                                          f]) for f in default_focals)  # camera intrinsics
-        self.im_pp = nn.ParameterList(torch.zeros((2,)) for _ in range(self.n_imgs))  # camera intrinsics
+        self.im_depthmaps = nn.ParameterList(
+            torch.randn(H, W) / 10 - 3 for H, W in self.imshapes
+        )  # log(depth)
+        self.im_poses = nn.ParameterList(
+            self.rand_pose(self.POSE_DIM) for _ in range(self.n_imgs)
+        )  # camera poses
+        default_focals = [
+            self.focal_brake * np.log(max(H, W)) for H, W in self.imshapes
+        ]
+        self.im_focals = nn.ParameterList(
+            torch.FloatTensor([f, f] if fx_and_fy else [f]) for f in default_focals
+        )  # camera intrinsics
+        self.im_pp = nn.ParameterList(
+            torch.zeros((2,)) for _ in range(self.n_imgs)
+        )  # camera intrinsics
         self.im_pp.requires_grad_(optimize_pp)
 
     def preset_pose(self, known_poses, pose_msk=None):  # cam-to-world
@@ -40,12 +49,14 @@ class ModularPointCloudOptimizer (BasePCOptimizer):
             known_poses = [known_poses]
         for idx, pose in zip(self._get_msk_indices(pose_msk), known_poses):
             if self.verbose:
-                print(f' (setting pose #{idx} = {pose[:3,3]})')
-            self._no_grad(self._set_pose(self.im_poses, idx, torch.tensor(pose), force=True))
+                print(f" (setting pose #{idx} = {pose[:3,3]})")
+            self._no_grad(
+                self._set_pose(self.im_poses, idx, torch.tensor(pose), force=True)
+            )
 
         # normalize scale if there's less than 1 known pose
         n_known_poses = sum((p.requires_grad is False) for p in self.im_poses)
-        self.norm_pw_scale = (n_known_poses <= 1)
+        self.norm_pw_scale = n_known_poses <= 1
 
     def preset_intrinsics(self, known_intrinsics, msk=None):
         if isinstance(known_intrinsics, torch.Tensor) and known_intrinsics.ndim == 2:
@@ -58,13 +69,13 @@ class ModularPointCloudOptimizer (BasePCOptimizer):
     def preset_focal(self, known_focals, msk=None):
         for idx, focal in zip(self._get_msk_indices(msk), known_focals):
             if self.verbose:
-                print(f' (setting focal #{idx} = {focal})')
+                print(f" (setting focal #{idx} = {focal})")
             self._no_grad(self._set_focal(idx, focal, force=True))
 
     def preset_principal_point(self, known_pp, msk=None):
         for idx, pp in zip(self._get_msk_indices(msk), known_pp):
             if self.verbose:
-                print(f' (setting principal point #{idx} = {pp})')
+                print(f" (setting principal point #{idx} = {pp})")
             self._no_grad(self._set_principal_point(idx, pp, force=True))
 
     def _no_grad(self, tensor):
@@ -83,11 +94,13 @@ class ModularPointCloudOptimizer (BasePCOptimizer):
         elif np.issubdtype(msk.dtype, np.integer):
             return msk
         else:
-            raise ValueError(f'bad {msk=}')
+            raise ValueError(f"bad {msk=}")
 
     def _set_focal(self, idx, focal, force=False):
         param = self.im_focals[idx]
-        if param.requires_grad or force:  # can only init a parameter not already initialized
+        if (
+            param.requires_grad or force
+        ):  # can only init a parameter not already initialized
             param.data[:] = self.focal_brake * np.log(focal)
         return param
 
@@ -98,12 +111,19 @@ class ModularPointCloudOptimizer (BasePCOptimizer):
     def _set_principal_point(self, idx, pp, force=False):
         param = self.im_pp[idx]
         H, W = self.imshapes[idx]
-        if param.requires_grad or force:  # can only init a parameter not already initialized
-            param.data[:] = to_cpu(to_numpy(pp) - (W/2, H/2)) / 10
+        if (
+            param.requires_grad or force
+        ):  # can only init a parameter not already initialized
+            param.data[:] = to_cpu(to_numpy(pp) - (W / 2, H / 2)) / 10
         return param
 
     def get_principal_points(self):
-        return torch.stack([pp.new((W/2, H/2))+10*pp for pp, (H, W) in zip(self.im_pp, self.imshapes)])
+        return torch.stack(
+            [
+                pp.new((W / 2, H / 2)) + 10 * pp
+                for pp, (H, W) in zip(self.im_pp, self.imshapes)
+            ]
+        )
 
     def get_intrinsics(self):
         K = torch.zeros((self.n_imgs, 3, 3), device=self.device)
@@ -120,7 +140,9 @@ class ModularPointCloudOptimizer (BasePCOptimizer):
 
     def _set_depthmap(self, idx, depth, force=False):
         param = self.im_depthmaps[idx]
-        if param.requires_grad or force:  # can only init a parameter not already initialized
+        if (
+            param.requires_grad or force
+        ):  # can only init a parameter not already initialized
             param.data[:] = depth.log().nan_to_num(neginf=0)
         return param
 
@@ -135,9 +157,16 @@ class ModularPointCloudOptimizer (BasePCOptimizer):
         depth = self.get_depthmaps()
 
         # convert focal to (1,2,H,W) constant field
-        def focal_ex(i): return focals[i][..., None, None].expand(1, *focals[i].shape, *self.imshapes[i])
+        def focal_ex(i):
+            return focals[i][..., None, None].expand(
+                1, *focals[i].shape, *self.imshapes[i]
+            )
+
         # get pointmaps in camera frame
-        rel_ptmaps = [depthmap_to_pts3d(depth[i][None], focal_ex(i), pp=pp[i:i+1])[0] for i in range(im_poses.shape[0])]
+        rel_ptmaps = [
+            depthmap_to_pts3d(depth[i][None], focal_ex(i), pp=pp[i : i + 1])[0]
+            for i in range(im_poses.shape[0])
+        ]
         # project to world frame
         return [geotrf(pose, ptmap) for pose, ptmap in zip(im_poses, rel_ptmaps)]
 
