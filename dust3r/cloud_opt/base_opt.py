@@ -6,12 +6,13 @@
 # --------------------------------------------------------
 from copy import deepcopy
 
-import dust3r.cloud_opt.init_im_poses as init_fun
 import numpy as np
 import roma
 import torch
 import torch.nn as nn
 import tqdm
+
+import dust3r.cloud_opt.init_im_poses as init_fun
 from dust3r.cloud_opt.commons import (
     ALL_DISTS,
     NoGradParamDict,
@@ -39,9 +40,9 @@ class BasePCOptimizer(nn.Module):
     def __init__(self, *args, **kwargs):
         if len(args) == 1 and len(kwargs) == 0:
             other = deepcopy(args[0])
-            attrs = """edges is_symmetrized dist n_imgs pred_i pred_j imshapes 
+            attrs = """edges is_symmetrized dist n_imgs pred_i pred_j imshapes
                         min_conf_thr conf_thr conf_i conf_j im_conf
-                        base_scale norm_pw_scale POSE_DIM pw_poses 
+                        base_scale norm_pw_scale POSE_DIM pw_poses
                         pw_adaptors pw_adaptors has_im_poses rand_pose imgs verbose""".split()
             self.__dict__.update({k: other[k] for k in attrs})
         else:
@@ -335,7 +336,7 @@ class BasePCOptimizer(nn.Module):
             return loss, details
         return loss
 
-    @torch.cuda.amp.autocast(enabled=False)
+    @torch.amp.autocast("cuda", enabled=False)
     def compute_global_alignment(self, init=None, niter_PnP=10, **kw):
         if init is None:
             pass

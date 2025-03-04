@@ -6,6 +6,7 @@
 # --------------------------------------------------------
 import torch
 import tqdm
+
 from dust3r.utils.device import collate_with_cat, to_cpu
 from dust3r.utils.geometry import depthmap_to_pts3d, geotrf
 from dust3r.utils.misc import invalid_to_nans
@@ -45,11 +46,11 @@ def loss_of_one_batch(
     if symmetrize_batch:
         view1, view2 = make_batch_symmetric(batch)
 
-    with torch.cuda.amp.autocast(enabled=bool(use_amp)):
+    with torch.amp.autocast("cuda", enabled=bool(use_amp)):
         pred1, pred2 = model(view1, view2)
 
         # loss is supposed to be symmetric
-        with torch.cuda.amp.autocast(enabled=False):
+        with torch.amp.autocast("cuda", enabled=False):
             loss = (
                 criterion(view1, view2, pred1, pred2) if criterion is not None else None
             )
